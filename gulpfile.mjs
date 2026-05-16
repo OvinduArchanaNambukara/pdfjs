@@ -32,7 +32,7 @@ import { preprocessPDFJSCode } from "./external/builder/preprocessor2.mjs";
 import rename from "gulp-rename";
 import replace from "gulp-replace";
 import rimraf from "rimraf";
-import stream from "stream";
+import streamx from "streamx";
 import streamqueue from "streamqueue";
 import through from "through2";
 import Vinyl from "vinyl";
@@ -157,8 +157,8 @@ function startNode(args, options) {
 }
 
 function createStringSource(filename, content) {
-  const source = stream.Readable({ objectMode: true });
-  source._read = function () {
+  const source = new streamx.Readable({ objectMode: true });
+  source._read = function (cb) {
     this.push(
       new Vinyl({
         path: filename,
@@ -166,8 +166,19 @@ function createStringSource(filename, content) {
       })
     );
     this.push(null);
+    if (cb) cb();
   };
   return source;
+}
+
+function mergeAndWait(streams) {
+  return Promise.all(
+    streams.map(s => new Promise((resolve, reject) => {
+      s.on("finish", resolve);
+      s.on("end", resolve);
+      s.on("error", reject);
+    }))
+  );
 }
 
 function createWebpackConfig(
@@ -613,6 +624,7 @@ function createImageDecodersBundle(defines) {
 function createCMapBundle() {
   return gulp.src(["external/bcmaps/*.bcmap", "external/bcmaps/LICENSE"], {
     base: "external/bcmaps",
+    allowEmpty: true,
   });
 }
 
@@ -626,6 +638,7 @@ function createStandardFontBundle() {
     ],
     {
       base: "external/standard_fonts",
+      allowEmpty: true,
     }
   );
 }
@@ -892,13 +905,14 @@ gulp.task("locale", function () {
     }
   }
 
-  return merge([
+  return mergeAndWait([
     createStringSource("locale.properties", viewerOutput).pipe(
       gulp.dest(VIEWER_LOCALE_OUTPUT)
     ),
     gulp
-      .src(L10N_DIR + "/{" + locales.join(",") + "}/viewer.properties", {
+      .src(L10N_DIR + "/*/viewer.properties", {
         base: L10N_DIR,
+        allowEmpty: true,
       })
       .pipe(gulp.dest(VIEWER_LOCALE_OUTPUT)),
   ]);
@@ -958,7 +972,7 @@ function preprocessHTML(source, defines) {
 function buildGeneric(defines, dir) {
   rimraf.sync(dir);
 
-  return merge([
+  return mergeAndWait([
     createMainBundle(defines).pipe(gulp.dest(dir + "build")),
     createWorkerBundle(defines).pipe(gulp.dest(dir + "build")),
     createSandboxBundle(defines).pipe(gulp.dest(dir + "build")),
@@ -967,11 +981,12 @@ function buildGeneric(defines, dir) {
         ? "generic/"
         : "generic-legacy/",
     }).pipe(gulp.dest(dir + "web")),
-    gulp.src(COMMON_WEB_FILES, { base: "web/" }).pipe(gulp.dest(dir + "web")),
-    gulp.src("LICENSE").pipe(gulp.dest(dir)),
+    gulp.src(COMMON_WEB_FILES, { base: "web/", allowEmpty: true }).pipe(gulp.dest(dir + "web")),
+    gulp.src("LICENSE", { allowEmpty: true }).pipe(gulp.dest(dir)),
     gulp
       .src(["web/locale/*/viewer.properties", "web/locale/locale.properties"], {
         base: "web/",
+        allowEmpty: true,
       })
       .pipe(gulp.dest(dir + "web")),
     createCMapBundle().pipe(gulp.dest(dir + "web/cmaps")),
@@ -989,7 +1004,7 @@ function buildGeneric(defines, dir) {
       .pipe(gulp.dest(dir + "web")),
 
     gulp
-      .src("web/compressed.tracemonkey-pldi-09.pdf")
+      .src("web/compressed.tracemonkey-pldi-09.pdf", { allowEmpty: true })
       .pipe(gulp.dest(dir + "web")),
   ]);
 }
@@ -1003,7 +1018,7 @@ gulp.task(
     "locale",
     function scriptingGeneric() {
       const defines = builder.merge(DEFINES, { GENERIC: true });
-      return merge([
+      return mergeAndWait([
         buildDefaultPreferences(defines, "generic/"),
         createTemporaryScriptingBundle(defines),
       ]);
@@ -1033,7 +1048,7 @@ gulp.task(
         GENERIC: true,
         SKIP_BABEL: false,
       });
-      return merge([
+      return mergeAndWait([
         buildDefaultPreferences(defines, "generic-legacy/"),
         createTemporaryScriptingBundle(defines),
       ]);
@@ -1062,7 +1077,7 @@ function buildComponents(defines, dir) {
     "web/images/loading-icon.gif",
   ];
 
-  return merge([
+  return mergeAndWait([
     createComponentsBundle(defines).pipe(gulp.dest(dir)),
     gulp.src(COMPONENTS_IMAGES).pipe(gulp.dest(dir + "images")),
     preprocessCSS("web/pdf_viewer.css", defines)
@@ -1139,7 +1154,7 @@ gulp.task(
 function buildMinified(defines, dir) {
   rimraf.sync(dir);
 
-  return merge([
+  return mergeAndWait([
     createMainBundle(defines).pipe(gulp.dest(dir + "build")),
     createWorkerBundle(defines).pipe(gulp.dest(dir + "build")),
     createSandboxBundle(defines).pipe(gulp.dest(dir + "build")),
@@ -1155,6 +1170,7 @@ function buildMinified(defines, dir) {
     gulp
       .src(["web/locale/*/viewer.properties", "web/locale/locale.properties"], {
         base: "web/",
+        allowEmpty: true,
       })
       .pipe(gulp.dest(dir + "web")),
     createCMapBundle().pipe(gulp.dest(dir + "web/cmaps")),
@@ -1172,7 +1188,7 @@ function buildMinified(defines, dir) {
       .pipe(gulp.dest(dir + "web")),
 
     gulp
-      .src("web/compressed.tracemonkey-pldi-09.pdf")
+      .src("web/compressed.tracemonkey-pldi-09.pdf", { allowEmpty: true })
       .pipe(gulp.dest(dir + "web")),
   ]);
 }
@@ -1255,7 +1271,7 @@ gulp.task(
     "locale",
     function scriptingMinified() {
       const defines = builder.merge(DEFINES, { MINIFIED: true, GENERIC: true });
-      return merge([
+      return mergeAndWait([
         buildDefaultPreferences(defines, "minified/"),
         createTemporaryScriptingBundle(defines),
       ]);
@@ -1288,7 +1304,7 @@ gulp.task(
         GENERIC: true,
         SKIP_BABEL: false,
       });
-      return merge([
+      return mergeAndWait([
         buildDefaultPreferences(defines, "minified-legacy/"),
         createTemporaryScriptingBundle(defines),
       ]);
@@ -1374,7 +1390,7 @@ gulp.task(
       // Clear out everything in the firefox extension build directory
       rimraf.sync(MOZCENTRAL_DIR);
 
-      return merge([
+      return mergeAndWait([
         createMainBundle(defines).pipe(
           gulp.dest(MOZCENTRAL_CONTENT_DIR + "build")
         ),
@@ -1443,7 +1459,7 @@ gulp.task(
         CHROME: true,
         SKIP_BABEL: false,
       });
-      return merge([
+      return mergeAndWait([
         buildDefaultPreferences(defines, "chromium/"),
         createTemporaryScriptingBundle(defines),
       ]);
@@ -1472,7 +1488,7 @@ gulp.task(
 
       const version = getVersionJSON().version;
 
-      return merge([
+      return mergeAndWait([
         createMainBundle(defines).pipe(
           gulp.dest(CHROME_BUILD_CONTENT_DIR + "build")
         ),
@@ -1486,13 +1502,13 @@ gulp.task(
           gulp.dest(CHROME_BUILD_CONTENT_DIR + "web")
         ),
         gulp
-          .src(CHROME_WEB_FILES, { base: "web/" })
+          .src(CHROME_WEB_FILES, { base: "web/", allowEmpty: true })
           .pipe(gulp.dest(CHROME_BUILD_CONTENT_DIR + "web")),
 
         gulp
           .src(
             ["web/locale/*/viewer.properties", "web/locale/locale.properties"],
-            { base: "web/" }
+            { base: "web/", allowEmpty: true }
           )
           .pipe(gulp.dest(CHROME_BUILD_CONTENT_DIR + "web")),
         createCMapBundle().pipe(
@@ -1635,7 +1651,7 @@ function buildLib(defines, dir) {
     ),
   });
 
-  const inputStream = merge([
+  const inputStream = mergeAndWait([
     gulp.src(
       [
         "src/{core,display,shared}/**/*.js",
@@ -1665,7 +1681,7 @@ gulp.task(
     createBuildNumber,
     function scriptingLib() {
       const defines = builder.merge(DEFINES, { GENERIC: true, LIB: true });
-      return merge([
+      return mergeAndWait([
         buildDefaultPreferences(defines, "lib/"),
         createTemporaryScriptingBundle(defines),
       ]);
@@ -1676,7 +1692,7 @@ gulp.task(
     function createLib() {
       const defines = builder.merge(DEFINES, { GENERIC: true, LIB: true });
 
-      return merge([
+      return mergeAndWait([
         buildLib(defines, "build/lib/"),
         createSandboxBundle(defines).pipe(gulp.dest("build/lib/")),
       ]);
@@ -1694,7 +1710,7 @@ gulp.task(
         LIB: true,
         SKIP_BABEL: false,
       });
-      return merge([
+      return mergeAndWait([
         buildDefaultPreferences(defines, "lib-legacy/"),
         createTemporaryScriptingBundle(defines),
       ]);
@@ -1709,7 +1725,7 @@ gulp.task(
         SKIP_BABEL: false,
       });
 
-      return merge([
+      return mergeAndWait([
         buildLib(defines, "build/lib-legacy/"),
         createSandboxBundle(defines).pipe(gulp.dest("build/lib-legacy/")),
       ]);
@@ -1736,7 +1752,7 @@ gulp.task(
 
     config.stableVersion = version;
 
-    return merge([
+    return mergeAndWait([
       createStringSource(CONFIG_FILE, JSON.stringify(config, null, 2)).pipe(
         gulp.dest(".")
       ),
@@ -1877,7 +1893,7 @@ gulp.task(
     "generic",
     "types",
     function createTypesTest() {
-      return merge([
+      return mergeAndWait([
         packageJson().pipe(gulp.dest(TYPESTEST_DIR)),
         gulp
           .src([
@@ -2112,7 +2128,7 @@ function ghPagesPrepare() {
 
   rimraf.sync(GH_PAGES_DIR);
 
-  return merge([
+  return mergeAndWait([
     gulp
       .src(GENERIC_DIR + "**/*", { base: GENERIC_DIR, removeBOM: false })
       .pipe(gulp.dest(GH_PAGES_DIR)),
@@ -2234,7 +2250,7 @@ gulp.task(
       console.log("### Overwriting all files");
       rimraf.sync(path.join(DIST_DIR, "*"));
 
-      return merge([
+      return mergeAndWait([
         packageJson().pipe(gulp.dest(DIST_DIR)),
         gulp
           .src("external/dist/**/*", {
