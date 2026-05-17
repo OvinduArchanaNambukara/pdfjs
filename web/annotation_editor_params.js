@@ -26,11 +26,6 @@ class AnnotationEditorParams {
   }
 
   #bindListeners({
-    editorFreeTextFontSize,
-    editorFreeTextColor,
-    editorInkColor,
-    editorInkThickness,
-    editorInkOpacity,
     editorStampAddImage,
   }) {
     const dispatchEvent = (typeStr, value) => {
@@ -40,45 +35,15 @@ class AnnotationEditorParams {
         value,
       });
     };
-    editorFreeTextFontSize.addEventListener("input", function () {
-      dispatchEvent("FREETEXT_SIZE", this.valueAsNumber);
-    });
-    editorFreeTextColor.addEventListener("input", function () {
-      dispatchEvent("FREETEXT_COLOR", this.value);
-    });
-    editorInkColor.addEventListener("input", function () {
-      dispatchEvent("INK_COLOR", this.value);
-    });
-    editorInkThickness.addEventListener("input", function () {
-      dispatchEvent("INK_THICKNESS", this.valueAsNumber);
-    });
-    editorInkOpacity.addEventListener("input", function () {
-      dispatchEvent("INK_OPACITY", this.valueAsNumber);
-    });
-    editorStampAddImage.addEventListener("click", () => {
-      dispatchEvent("CREATE");
-    });
+
+    if (editorStampAddImage) {
+      editorStampAddImage.addEventListener("click", () => {
+        dispatchEvent("CREATE");
+      });
+    }
 
     this.eventBus._on("annotationeditorparamschanged", evt => {
-      for (const [type, value] of evt.details) {
-        switch (type) {
-          case AnnotationEditorParamsType.FREETEXT_SIZE:
-            editorFreeTextFontSize.value = value;
-            break;
-          case AnnotationEditorParamsType.FREETEXT_COLOR:
-            editorFreeTextColor.value = value;
-            break;
-          case AnnotationEditorParamsType.INK_COLOR:
-            editorInkColor.value = value;
-            break;
-          case AnnotationEditorParamsType.INK_THICKNESS:
-            editorInkThickness.value = value;
-            break;
-          case AnnotationEditorParamsType.INK_OPACITY:
-            editorInkOpacity.value = value;
-            break;
-        }
-      }
+      // No longer need to update free text or ink editors.
     });
   }
 }
