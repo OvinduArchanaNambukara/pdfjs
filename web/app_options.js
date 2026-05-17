@@ -38,6 +38,16 @@ if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
       compatibilityParams.maxCanvasPixels = 5242880;
     }
   })();
+
+  // Prefer bundled standard fonts over system fonts on mobile. Android/iOS
+  // rarely ship desktop PDF font names (Arial, Times New Roman, etc.), so
+  // `local()` substitution often resolves to Roboto/Noto and looks wrong.
+  // Support: Android, iOS
+  (function checkUseSystemFonts() {
+    if (isIOS || isAndroid) {
+      compatibilityParams.useSystemFonts = false;
+    }
+  })();
 }
 
 const OptionKind = {
@@ -225,6 +235,11 @@ const defaultOptions = {
     /** @type {boolean} */
     value: false,
     kind: OptionKind.API + OptionKind.PREFERENCE,
+  },
+  useSystemFonts: {
+    /** @type {boolean} */
+    value: true,
+    kind: OptionKind.API,
   },
   disableRange: {
     /** @type {boolean} */
