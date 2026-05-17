@@ -1204,24 +1204,23 @@ async function parseMinified(dir) {
   const pdfImageDecodersFile = fs
     .readFileSync(dir + "/image_decoders/pdf.image_decoders.js")
     .toString();
-  const viewerFiles = {
-    "pdf.js": pdfFile,
-    "viewer.js": fs.readFileSync(dir + "/web/viewer.js").toString(),
-  };
+  const viewerFile = fs.readFileSync(dir + "/web/viewer.js").toString();
 
   console.log();
   console.log("### Minifying js files");
 
   const { minify } = await import("terser");
   const options = {
-    compress: false,
+    compress: {
+      sequences: false,
+    },
     keep_classnames: true,
     keep_fnames: true,
   };
 
   fs.writeFileSync(
-    dir + "/web/pdf.viewer.js",
-    (await minify(viewerFiles, options)).code
+    dir + "/web/viewer.min.js",
+    (await minify(viewerFile, options)).code
   );
   fs.writeFileSync(
     dir + "/build/pdf.min.js",
@@ -1249,6 +1248,7 @@ async function parseMinified(dir) {
   fs.unlinkSync(dir + "/build/pdf.worker.js");
   fs.unlinkSync(dir + "/build/pdf.sandbox.js");
 
+  fs.renameSync(dir + "/web/viewer.min.js", dir + "/web/viewer.js");
   fs.renameSync(dir + "/build/pdf.min.js", dir + "/build/pdf.js");
   fs.renameSync(dir + "/build/pdf.worker.min.js", dir + "/build/pdf.worker.js");
   fs.renameSync(
