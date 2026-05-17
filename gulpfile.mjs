@@ -1214,10 +1214,7 @@ async function parseMinified(dir) {
 
   const { minify } = await import("terser");
   const options = {
-    compress: {
-      // V8 chokes on very long sequences, work around that.
-      sequences: false,
-    },
+    compress: false,
     keep_classnames: true,
     keep_fnames: true,
   };
