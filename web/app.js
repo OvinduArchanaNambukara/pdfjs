@@ -366,6 +366,12 @@ const PDFViewerApplication = {
     ) {
       AppOptions.set("locale", params.get("locale"));
     }
+    if (params.has("standardfontdataurl")) {
+      AppOptions.set("standardFontDataUrl", params.get("standardfontdataurl"));
+    }
+    if (params.has("cmapurl")) {
+      AppOptions.set("cMapUrl", params.get("cmapurl"));
+    }
   },
 
   /**
@@ -941,6 +947,23 @@ const PDFViewerApplication = {
     }
     // Set the necessary API parameters, using all the available options.
     const apiParams = AppOptions.getAll(OptionKind.API);
+
+    // Resolve standardFontDataUrl and cMapUrl to absolute URLs if they are relative.
+    if (apiParams.standardFontDataUrl && !/^[a-z][a-z0-9+-.]*:/i.test(apiParams.standardFontDataUrl)) {
+      try {
+        apiParams.standardFontDataUrl = new URL(apiParams.standardFontDataUrl, window.location.href).href;
+      } catch (e) {
+        console.error("Failed to resolve standardFontDataUrl as absolute URL:", e);
+      }
+    }
+    if (apiParams.cMapUrl && !/^[a-z][a-z0-9+-.]*:/i.test(apiParams.cMapUrl)) {
+      try {
+        apiParams.cMapUrl = new URL(apiParams.cMapUrl, window.location.href).href;
+      } catch (e) {
+        console.error("Failed to resolve cMapUrl as absolute URL:", e);
+      }
+    }
+
     const params = {
       canvasMaxAreaInBytes: this.externalServices.canvasMaxAreaInBytes,
       ...apiParams,
